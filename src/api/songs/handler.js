@@ -55,9 +55,10 @@ class SongsHandler {
     }
   }
 
-  async getSongsHandler(h) {
+  async getSongsHandler(request, h) {
     try {
-      const songs = await this._service.getSongs();
+      const { title, performer } = request.query;
+      const songs = await this._service.getSongs({ title, performer });
       return {
         status: 'success',
         data: {
@@ -120,17 +121,15 @@ class SongsHandler {
     try {
       this._validator.validateSongPayload(request.payload);
       const {
-        title, year, genre, permorfer, duration, albumId,
+        title, year, genre, performer, duration, albumId,
       } = request.payload;
       const { id } = request.params;
-
-      this._service.editSongById(id, {
-        title, year, genre, permorfer, duration, albumId,
+      await this._service.editSongById(id, {
+        title, year, genre, performer, duration, albumId,
       });
-
       return {
         status: 'success',
-        message: 'Lagu berhasil diperbarui',
+        message: 'Song berhasil diperbarui',
       };
     } catch (error) {
       if (error instanceof ClientError) {

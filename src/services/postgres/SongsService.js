@@ -2,7 +2,7 @@ const { Pool } = require('pg');
 const { nanoid } = require('nanoid');
 const InvariantError = require('../../exceptions/InvariantError');
 const NotFoundError = require('../../exceptions/NotFoundError');
-const { mapDBToModel } = require('../../utils/songsDB');
+const { mapDBToModelSong } = require('../../utils/songsDB');
 
 class SongsService {
   constructor() {
@@ -28,9 +28,24 @@ class SongsService {
     return result.rows[0].id;
   }
 
-  async getSongs() {
-    const result = await this._pool.query('SELECT * FROM songs');
-    return result.rows.map(mapDBToModel);
+  async getSongs({ title, performer }) {
+    if (title && performer) {
+      const result = await this._pool.query(
+        `SELECT id, title, performer FROM songs WHERE LOWER(title) LIKE '%${title}%' AND LOWER(performer) LIKE '%${performer}%'`,
+      );
+      return result.rows;
+    }
+
+    if (title || performer) {
+      const result = await this._pool.query(
+        `SELECT id, title, performer FROM songs WHERE LOWER(title) LIKE '%${title}%' OR LOWER(performer) LIKE '%${performer}%'`,
+      );
+      return result.rows;
+    }
+    const result = await this._pool.query(
+      'SELECT id, title, performer FROM songs',
+    );
+    return result.rows;
   }
 
   async getSongById(id) {
@@ -44,21 +59,19 @@ class SongsService {
       throw new NotFoundError('Lagu tidak ditemukan');
     }
 
-    return result.rows.map(mapDBToModel)[0];
+    return result.rows.map(mapDBToModelSong)[0];
   }
 
   async editSongById(id, {
-    title, year, performer, genre, duration, albumId,
+    title, year, genre, performer, duration, albumId,
   }) {
     const query = {
-      text: 'UPDATE songs SET title = $1, year = $2, performer = $3, genre = $4, duration = $5, albumId = $6 WHERE id = $7 RETURNING id',
-      values: [title, year, performer, genre, duration, albumId, id],
+      text: 'UPDATE songs SET title = $1, year = $2, genre = $3, performer = $4, duration = $5, "albumId" = $6 WHERE id = $7 RETURNING id ',
+      values: [title, year, genre, performer, duration, albumId, id],
     };
-
-    const result = await this._pool.query(query);
-
-    if (!result.rows.length) {
-      throw new NotFoundError('Lagu memperbarui catatan. Id tidak ditemukan');
+    const resultSong = await this._pool.query(query);
+    if (!resultSong.rows.length) {
+      throw new NotFoundError('Gagal Memperbarui lagu');
     }
   }
 

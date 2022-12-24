@@ -34,11 +34,11 @@ class AlbumsService {
     };
     const result = await this._pool.query(query);
 
-    if (!result.rows.length) {
+    if (!result.rowCount) {
       throw new NotFoundError('Album tidak ditemukan');
     }
 
-    return result.rows.map(mapDBToModelAlbum)[0];
+    return mapDBToModelAlbum(result.rows[0]);
   }
 
   async editAlbumById(id, { name, year }) {

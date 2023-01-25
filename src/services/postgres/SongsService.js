@@ -3,6 +3,7 @@ const { nanoid } = require('nanoid');
 const InvariantError = require('../../exceptions/InvariantError');
 const NotFoundError = require('../../exceptions/NotFoundError');
 const { mapDBToModelSong } = require('../../utils/songsDB');
+const { mapDBToModelPlaylistSongs } = require('../../utils/playlistSongDB');
 
 class SongsService {
   constructor() {
@@ -55,11 +56,23 @@ class SongsService {
     };
     const result = await this._pool.query(query);
 
-    if (!result.rows.length) {
+    if (!result.rowCount) {
       throw new NotFoundError('Lagu tidak ditemukan');
     }
 
     return result.rows.map(mapDBToModelSong)[0];
+  }
+
+  async getSongsByPlaylistId(playlistId) {
+    const query = {
+      text: `SELECT songs.id, songs.title, songs.performer FROM songs
+        JOIN playlistsong ON songs.id = playlistsong."songId"
+        JOIN playlists ON playlistsong."playlistId" = playlists.id
+        WHERE "playlistId" = $1`,
+      values: [playlistId],
+    };
+    const result = await this._pool.query(query);
+    return result.rows.map(mapDBToModelPlaylistSongs);
   }
 
   async editSongById(id, {
@@ -70,7 +83,7 @@ class SongsService {
       values: [title, year, genre, performer, duration, albumId, id],
     };
     const resultSong = await this._pool.query(query);
-    if (!resultSong.rows.length) {
+    if (!resultSong.rowCount) {
       throw new NotFoundError('Gagal Memperbarui lagu');
     }
   }
@@ -83,8 +96,21 @@ class SongsService {
 
     const result = await this._pool.query(query);
 
-    if (!result.rows.length) {
+    if (!result.rowCount) {
       throw new NotFoundError('Lagu gagal dihapus. Id tidak ditemukan');
+    }
+  }
+
+  async verifySongIsExists(id) {
+    const query = await this._pool.query({
+      text: 'SELECT id FROM songs WHERE id = $1',
+      values: [id],
+    });
+
+    const result = await this._pool.query(query);
+
+    if (!result.rowCount) {
+      throw new NotFoundError('Lagu tidak ditemukan');
     }
   }
 }

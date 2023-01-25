@@ -1,6 +1,7 @@
 require('dotenv').config();
 
 const Hapi = require('@hapi/hapi');
+const Jwt = require('@hapi/jwt');
 
 // Album
 const albums = require('./api/albums');
@@ -12,12 +13,43 @@ const songs = require('./api/songs');
 const SongsService = require('./services/postgres/SongsService');
 const SongsValidator = require('./validator/songs');
 
+// User
+const users = require('./api/users');
+const UserService = require('./services/postgres/UserService');
+const UserValidator = require('./validator/users');
+
+// Auth
+const authentications = require('./api/auth');
+const AuthService = require('./services/postgres/AuthService');
+const TokenManager = require('./tokenize/TokenManager');
+const AuthValidator = require('./validator/auth');
+
+// Playlist
+const playlists = require('./api/playlist');
+const PlaylistsService = require('./services/postgres/PlaylistsService');
+const PlaylistsValidator = require('./validator/playlists');
+
+// Playlist Song
+const playlistSongs = require('./api/playlistsong');
+const PlaylistSongsService = require('./services/postgres/PlaylistSongService');
+const PlaylistSongValidator = require('./validator/playlistsong');
+
+// Collaboration
+const collaborations = require('./api/collaborations');
+const CollaborationsService = require('./services/postgres/CollaborationsService');
+const CollaborationsValidator = require('./validator/collaborations');
+
 // Error
 const ClientError = require('./exceptions/ClientError');
 
 const init = async () => {
   const albumsService = new AlbumsService();
   const songsService = new SongsService();
+  const collaborationsService = new CollaborationsService();
+  const playlistsService = new PlaylistsService(collaborationsService);
+  const playlistSongsService = new PlaylistSongsService();
+  const usersService = new UserService();
+  const authService = new AuthService();
 
   const server = Hapi.server({
     port: process.env.PORT,
@@ -27,6 +59,30 @@ const init = async () => {
         origin: ['*'],
       },
     },
+  });
+
+  // Plugin eksternal
+  await server.register([
+    {
+      plugin: Jwt,
+    },
+  ]);
+
+  // auth Jwt
+  server.auth.strategy('openmusic_jwt', 'jwt', {
+    keys: process.env.ACCESS_TOKEN_KEY,
+    verify: {
+      aud: false,
+      iss: false,
+      sub: false,
+      maxAgeSec: process.env.ACCESS_TOKEN_AGE,
+    },
+    validate: (artifacts) => ({
+      isValid: true,
+      credentials: {
+        id: artifacts.decoded.payload.id,
+      },
+    }),
   });
 
   await server.register([
@@ -42,6 +98,46 @@ const init = async () => {
       options: {
         service: songsService,
         validator: SongsValidator,
+      },
+    },
+    {
+      plugin: users,
+      options: {
+        service: usersService,
+        validator: UserValidator,
+      },
+    },
+    {
+      plugin: authentications,
+      options: {
+        authService,
+        usersService,
+        tokenManager: TokenManager,
+        validator: AuthValidator,
+      },
+    },
+    {
+      plugin: playlists,
+      options: {
+        service: playlistsService,
+        validator: PlaylistsValidator,
+      },
+    },
+    {
+      plugin: playlistSongs,
+      options: {
+        playlistSongsService,
+        songsService,
+        playlistsService,
+        validator: PlaylistSongValidator,
+      },
+    },
+    {
+      plugin: collaborations,
+      options: {
+        collaborationsService,
+        playlistsService,
+        validator: CollaborationsValidator,
       },
     },
   ]);

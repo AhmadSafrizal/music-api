@@ -72,6 +72,18 @@ class PlaylistSongsService {
     }
   }
 
+  async verifySong(songId) {
+    const query = {
+      text: 'SELECT * FROM songs WHERE id = $1',
+      values: [songId],
+    };
+    const result = await this._pool.query(query);
+
+    if (!result.rows.length) {
+      throw new NotFoundError('Lagu tidak ditemukan');
+    }
+  }
+
   async verifyPlaylistOwner(id, owner) {
     const query = {
       text: 'SELECT playlists.owner FROM playlists WHERE id = $1',

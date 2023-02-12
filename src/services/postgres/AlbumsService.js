@@ -75,6 +75,19 @@ class AlbumsService {
     const result = await this._pool.query(query);
     return result.rows.map(mapDBToModelSong);
   }
+
+  async addCoverAlbum(id, cover) {
+    console.log(cover, id);
+    const query = {
+      text: 'update albums set "coverUrl" = $1 WHERE id = $2 returning id',
+      values: [cover, id],
+    };
+    const result = await this._pool.query(query);
+
+    if (!result.rowCount) {
+      throw new InvariantError('Cover gagal ditambahkan');
+    }
+  }
 }
 
 module.exports = AlbumsService;

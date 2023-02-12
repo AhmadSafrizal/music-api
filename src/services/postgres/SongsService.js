@@ -68,7 +68,7 @@ class SongsService {
       text: `SELECT songs.id, songs.title, songs.performer FROM songs
         JOIN playlistsong ON songs.id = playlistsong."songId"
         JOIN playlists ON playlistsong."playlistId" = playlists.id
-        WHERE "playlistId" = $1`,
+        WHERE playlistsong."playlistId" = $1`,
       values: [playlistId],
     };
     const result = await this._pool.query(query);

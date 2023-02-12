@@ -2,6 +2,8 @@ require('dotenv').config();
 
 const Hapi = require('@hapi/hapi');
 const Jwt = require('@hapi/jwt');
+const Inert = require('@hapi/inert');
+const path = require('path');
 
 // Album
 const albums = require('./api/albums');
@@ -39,6 +41,21 @@ const collaborations = require('./api/collaborations');
 const CollaborationsService = require('./services/postgres/CollaborationsService');
 const CollaborationsValidator = require('./validator/collaborations');
 
+// Exports
+const _exports = require('./api/exports');
+const ProducerService = require('./services/rabbitmq/ProducerService');
+const ExportsValidator = require('./validator/exports');
+
+// Uploads
+const uploads = require('./api/uploads');
+const StorageService = require('./services/storage/StorageService');
+const UploadsValidator = require('./validator/uploads');
+
+// Album Like
+const albumsLike = require('./api/albumsLike');
+const AlbumsLikeService = require('./services/postgres/AlbumsLikeService');
+const CacheService = require('./services/redis/CacheService');
+
 // Error
 const ClientError = require('./exceptions/ClientError');
 
@@ -47,9 +64,12 @@ const init = async () => {
   const songsService = new SongsService();
   const collaborationsService = new CollaborationsService();
   const playlistsService = new PlaylistsService(collaborationsService);
-  const playlistSongsService = new PlaylistSongsService();
+  const playlistSongsService = new PlaylistSongsService(collaborationsService);
   const usersService = new UserService();
   const authService = new AuthService();
+  const storageService = new StorageService(path.resolve(__dirname, 'api/uploads/file/covers'));
+  const cacheService = new CacheService();
+  const albumsLikeService = new AlbumsLikeService(cacheService);
 
   const server = Hapi.server({
     port: process.env.PORT,
@@ -65,6 +85,9 @@ const init = async () => {
   await server.register([
     {
       plugin: Jwt,
+    },
+    {
+      plugin: Inert,
     },
   ]);
 
@@ -138,6 +161,29 @@ const init = async () => {
         collaborationsService,
         playlistsService,
         validator: CollaborationsValidator,
+      },
+    },
+    {
+      plugin: _exports,
+      options: {
+        service: ProducerService,
+        playlistsService,
+        validator: ExportsValidator,
+      },
+    },
+    {
+      plugin: uploads,
+      options: {
+        service: storageService,
+        albumsService,
+        validator: UploadsValidator,
+      },
+    },
+    {
+      plugin: albumsLike,
+      options: {
+        service: albumsLikeService,
+        albumsService,
       },
     },
   ]);

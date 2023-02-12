@@ -18,23 +18,24 @@ class PlaylistSongHandler {
 
       const { id: playlistId } = request.params;
       const { songId } = request.payload;
-      const { id } = request.auth.credentials;
+      const { id: credentialId } = request.auth.credentials;
 
-      await this._playlistSongsService.verifyPlaylistAccess(playlistId, id);
+      await this._playlistSongsService.verifySong(songId);
+      await this._playlistSongsService.verifyPlaylistAccess(playlistId, credentialId);
+
+      // eslint-disable-next-line max-len
+      const playlistSongId = await this._playlistSongsService.addPlaylistSong(
+        playlistId,
+        songId,
+      );
 
       // activity
       await this._songsService.getSongById(songId);
       await this._playlistSongsService.postActivity(
         playlistId,
         songId,
-        id,
+        credentialId,
         'add',
-      );
-
-      // eslint-disable-next-line max-len
-      const playlistSongId = await this._playlistSongsService.addPlaylistSong(
-        playlistId,
-        songId,
       );
 
       const response = h.response({
@@ -70,25 +71,25 @@ class PlaylistSongHandler {
   async getSongsHandler(request, h) {
     try {
       const { id: playlistId } = request.params;
-      const { id: owner } = request.auth.credentials;
+      const { id: credentialId } = request.auth.credentials;
 
-      await this._playlistsService.verifyPlaylistOwner(
+      await this._playlistsService.verifyPlaylistAccess(
         playlistId,
-        owner,
+        credentialId,
       );
 
-      const playlists = await this._playlistsService.getPlaylistById(
-        owner,
+      const playlist = await this._playlistsService.getPlaylistById(
+        credentialId,
         playlistId,
       );
 
       const songs = await this._songsService.getSongsByPlaylistId(playlistId);
-      playlists.songs = songs;
+      playlist.songs = songs;
 
       return {
         status: 'success',
         data: {
-          playlist: playlists,
+          playlist,
         },
       };
     } catch (error) {
@@ -162,18 +163,18 @@ class PlaylistSongHandler {
       this._validator.validatePlaylistSongPayload(request.payload);
       const { id: playlistId } = request.params;
       const { songId } = request.payload;
-      const { id } = request.auth.credentials;
+      const { id: credentialId } = request.auth.credentials;
 
       await this._songsService.getSongById(songId);
       await this._playlistSongsService.postActivity(
         playlistId,
         songId,
-        id,
+        credentialId,
         'delete',
       );
 
       const owner = await this._playlistsService.getOwnerPlaylistById(playlistId);
-      if (owner !== id) {
+      if (owner !== credentialId) {
         throw new AuthorizationError('Anda tidak berhak menghapus lagu di playlist');
       }
 
